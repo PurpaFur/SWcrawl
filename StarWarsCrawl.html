@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Star Wars–style Crawl Generator (HTML)</title>
+<link href="https://fonts.googleapis.com/css2?family=News+Cycle:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --crawl-width: 41vw;
+    --base-font: 59px;
+    --letter-space: 0.7px;
+    --crawl-duration: 75s;
+    --title-hold: 3s;
+    --title-fade: 1.5s;
+    --logo-hold: 2.2s;
+    --logo-shrink: 2.2s;
+    --tilt: 27deg;
+    --persp: 500px;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif}
+
+  .app{display:grid;grid-template-columns:380px 1fr;gap:0;height:100%}
+  @media (max-width: 980px){.app{grid-template-columns:1fr;grid-auto-rows:auto 1fr}}
+
+  .panel{padding:16px;overflow:auto;background:#0b0b0b}
+  .panel h1{font-size:22px;margin:0 0 8px}
+  .row{margin:12px 0}
+  label{display:block;font-size:12px;opacity:.85;margin:0 0 6px}
+  textarea,input[type="text"],input[type="url"],input[type="file"],input[type="range"]{width:100%}
+  textarea{min-height:96px;resize:vertical;background:#121212;border:1px solid #262626;color:#ddd;border-radius:10px;padding:10px}
+  input[type="text"],input[type="url"],input[type="file"],input[type="range"]{background:#121212;border:1px solid #262626;color:#ddd;border-radius:10px;padding:8px}
+  input[type="range"]{padding:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .muted{font-size:11px;opacity:.7}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .btn{appearance:none;border:0;border-radius:14px;padding:10px 14px;font-weight:600;cursor:pointer}
+  .btn.primary{background:#fff;color:#000}
+  .btn.ghost{background:#1f1f1f;color:#ddd}
+
+  .stage{position:relative;overflow:hidden;width:100%;height:100%;background:#000}
+  #starCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  .title-layer{position:absolute;inset:0;display:none;place-items:center}
+  .state-title .title-layer{display:grid}
+  .title-text{font-family:'News Cycle',system-ui,sans-serif;font-weight:700;letter-spacing:.04em;font-size:calc(var(--base-font)*.9);color:#2bd3ff;opacity:0;white-space:pre-wrap;text-align:center;line-height:1.05}
+  .state-title .title-text{animation:titleHold var(--title-hold) linear forwards, titleFade var(--title-fade) ease var(--title-hold) forwards}
+  @keyframes titleHold{from{opacity:1}to{opacity:1}}
+  @keyframes titleFade{from{opacity:1}to{opacity:0}}
+
+  .logo-layer{position:absolute;inset:0;display:none;place-items:center}
+  .state-logo .logo-layer{display:grid}
+  .logo-text{font-family:"Star Jedi Outline", Impact, system-ui, sans-serif;color:#ffe81f;text-align:center;line-height:.9;letter-spacing:.02em;filter:drop-shadow(0 0 8px rgba(0,0,0,.9))}
+  .logo-text span{display:block}
+  .state-logo .logo-text{animation:logoHold var(--logo-hold) linear forwards, logoShrink var(--logo-shrink) ease var(--logo-hold) forwards}
+  @keyframes logoHold{from{opacity:1;transform:scale(1)}to{opacity:1;transform:scale(1)}}
+  @keyframes logoShrink{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.15)}}
+
+  .perspective{perspective:var(--persp);position:absolute;inset:0}
+  .crawl{position:absolute;bottom:-100vh;left:50%;transform:translateX(-50%) rotateX(var(--tilt)) translateY(100vh);width:var(--crawl-width);transform-origin:50% 100%;color:#ffe81f;font-family:'News Cycle',system-ui,sans-serif;text-align:justify;letter-spacing:var(--letter-space);filter:drop-shadow(0 0 2px rgba(0,0,0,.6));opacity:0}
+  .crawl .episode{text-align:center;font-weight:700;font-size:calc(var(--base-font)*.8);margin:0 0 .4em}
+  .crawl .subtitle{text-align:center;font-weight:700;font-size:calc(var(--base-font)*1.2);margin:0 0 .7em;letter-spacing:calc(var(--letter-space)*1.2)}
+  .crawl .para{font-size:calc(var(--base-font)*.85);line-height:1.55;margin:0 0 1.2em}
+  .state-crawl .crawl{animation:crawl var(--crawl-duration) linear forwards;opacity:1}
+  @keyframes crawl{0%{transform:translateX(-50%) rotateX(var(--tilt)) translateY(100vh);opacity:1}100%{transform:translateX(-50%) rotateX(var(--tilt)) translateY(-220vh);opacity:1}}
+  .fade{position:absolute;left:0;right:0;bottom:0;height:50vh;background:linear-gradient(0deg,#000 0%,transparent 60%);pointer-events:none}
+
+  .overlay{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.6)}
+  .state-done .overlay{display:grid}
+
+  .range-label{display:flex;justify-content:space-between;font-size:11px;opacity:.7}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel">
+    <h1>Star Wars–style Crawl Generator</h1>
+
+    <div class="row">
+      <label>Title card text</label>
+      <textarea id="titleCard">A LONG TIME AGO
+IN A GALAXY FAR,
+FAR AWAY....</textarea>
+    </div>
+
+    <div class="row grid2">
+      <div>
+        <label>Episode</label>
+        <input id="episode" type="text" value="EPISODE IV" />
+      </div>
+      <div>
+        <label>Subtitle</label>
+        <input id="subtitle" type="text" value="A NEW HOPE" />
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Body</label>
+      <textarea id="body">It is a period of civil war.
+Rebel spaceships, striking
+from a hidden base, have won
+their first victory against
+the evil Galactic Empire.
+
+During the battle, Rebel
+spies managed to steal secret
+plans to the Empire’s ultimate
+weapon, the DEATH STAR, an
+armored space station with
+enough power to destroy an
+entire planet.
+
+Pursued by the Empire’s
+sinister agents, Princess
+Leia races home aboard her
+starship, custodian of the
+stolen plans that can save her
+people and restore freedom to
+the galaxy....</textarea>
+    </div>
+
+    <!-- Visual sliders -->
+    <div class="row"><div class="range-label"><span>Crawl width</span><span id="wVal">56%</span></div><input id="width" type="range" min="28" max="80" value="41" /></div>
+    <div class="row"><div class="range-label"><span>Base font</span><span id="fVal">57px</span></div><input id="base" type="range" min="20" max="72" value="59" /></div>
+    <div class="row"><div class="range-label"><span>Letter spacing</span><span id="lsVal">0.5px</span></div><input id="ls" type="range" min="0" max="3" step="0.1" value="0.7" /></div>
+    <div class="row"><div class="range-label"><span>Crawl duration</span><span id="spdVal">60s</span></div><input id="speed" type="range" min="20" max="160" value="75" /></div>
+    <div class="row"><div class="range-label"><span>Title hold</span><span id="thVal">3.0s</span></div><input id="thold" type="range" min="0.5" max="8" step="0.1" value="3" /></div>
+    <div class="row"><div class="range-label"><span>Title fade</span><span id="tfVal">1.5s</span></div><input id="tfade" type="range" min="0.3" max="4" step="0.1" value="1.5" /></div>
+    <div class="row"><div class="range-label"><span>Star count</span><span id="scVal">600</span></div><input id="starCount" type="range" min="0" max="3000" step="50" value="600" /></div>
+    <div class="row"><div class="range-label"><span>Tilt</span><span id="tiltVal">27°</span></div><input id="tilt" type="range" min="10" max="45" step="1" value="27" /></div>
+    <div class="row"><div class="range-label"><span>Perspective</span><span id="perspVal">500px</span></div><input id="persp" type="range" min="400" max="2000" step="50" value="500" /></div>
+    <div class="row"><div class="range-label"><span>Logo hold</span><span id="lhVal">1.2s</span></div><input id="logoHold" type="range" min="0.5" max="5" step="0.1" value="2.2" /></div>
+    <div class="row"><div class="range-label"><span>Logo fly-out</span><span id="lsrVal">2.2s</span></div><input id="logoShrink" type="range" min="0.5" max="5" step="0.1" value="2.2" /></div>
+
+    <!-- Music controls -->
+    <div class="row">
+      <label>Music (optional, local file)</label>
+      <input id="musicFile" type="file" accept="audio/*" />
+      <div class="range-label" style="margin-top:8px"><span>Music volume</span><span id="volVal">0.6</span></div>
+      <input id="musicVol" type="range" min="0" max="1" step="0.01" value="0.6" />
+      <div class="range-label" style="margin-top:8px"><span>Music delay</span><span id="delayVal">2.2s</span></div>
+      <input id="musicDelay" type="range" min="0" max="5" step="0.1" value="0" />
+      <div class="range-label" style="margin-top:8px"><span>Music sync offset</span><span id="offsetVal">0.0s</span></div>
+      <input id="musicOffset" type="range" min="-5" max="5" step="0.1" value="0" />
+      <div class="range-label" style="margin-top:8px"><span>Fade-out duration</span><span id="fadeVal">3.0s</span></div>
+      <input id="musicFade" type="range" min="0" max="10" step="0.1" value="3" />
+      <div class="range-label" style="margin-top:8px"><span>Fade-out start offset (before end)</span><span id="fadeStartVal">0.0s</span></div>
+      <input id="musicFadeStart" type="range" min="0" max="20" step="0.1" value="0" />
+      <div class="muted" style="margin-top:6px">Use licensed or royalty-free audio only. The original Star Wars score is copyrighted; load your own legal track here.</div>
+    </div>
+
+    <div class="row" style="display:flex;align-items:center;gap:8px"><input id="starsToggle" type="checkbox" checked><label for="starsToggle" style="margin:0">Starfield background</label></div>
+    <div class="muted">Tip: Increase width to reduce wrapping. Record at 4K for sharp text.</div>
+
+    <div class="controls">
+      <button id="start" class="btn primary">Full Screen + Start</button>
+      <button id="exit" class="btn ghost">Exit</button>
+    </div>
+  </div>
+
+  <div id="stage" class="stage">
+    <canvas id="starCanvas"></canvas>
+
+    <div class="title-layer"><pre id="titleText" class="title-text"></pre></div>
+
+    <div class="logo-layer"><div id="logoText" class="logo-text" aria-hidden="true"><span>STAR WARS</span></div></div>
+
+    <div class="perspective">
+      <div id="crawl" class="crawl">
+        <p class="episode" id="epOut"></p>
+        <h2 class="subtitle" id="subOut"></h2>
+        <div id="bodyOut"></div>
+      </div>
+      <div class="fade"></div>
+    </div>
+
+    <div class="overlay"><div class="controls"><button id="replay" class="btn primary">Replay</button><button id="close" class="btn ghost">Exit</button></div></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// Restored full JS. Previous turn left only a comment, which disabled all controls.
+
+// DOM refs
+const root = document.documentElement;
+const stage = document.getElementById('stage');
+const starCanvas = document.getElementById('starCanvas');
+const ctx = starCanvas.getContext('2d');
+const titleText = document.getElementById('titleText');
+const epOut = document.getElementById('epOut');
+const subOut = document.getElementById('subOut');
+const bodyOut = document.getElementById('bodyOut');
+const logoText = document.getElementById('logoText');
+const q = id => document.getElementById(id);
+
+// audio
+const audio = new Audio();
+audio.preload = 'auto';
+let audioURL=null, fadeTimer=null;
+let timers=[];
+
+// ---- helpers ----
+function splitParagraphs(text){
+  const t = (text||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+  if(!t) return [];
+  return t.split(/\n{2,}/);
+}
+function ms(val){ const n=parseFloat(val||'0'); return /ms$/.test(val)?n:n*1000; }
+function getVar(name){ return getComputedStyle(root).getPropertyValue(name).trim(); }
+function clearTimers(){ timers.forEach(clearTimeout); timers=[]; if(fadeTimer){clearInterval(fadeTimer); fadeTimer=null;} }
+
+// canvas
+function resizeCanvas(){
+  const dpr = Math.max(1, window.devicePixelRatio||1);
+  starCanvas.width = Math.round(starCanvas.clientWidth*dpr);
+  starCanvas.height = Math.round(starCanvas.clientHeight*dpr);
+  ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr);
+}
+function toggleStars(on){ starCanvas.style.display = on ? 'block' : 'none'; }
+function drawStars(n){
+  if(starCanvas.style.display==='none') return;
+  const w=starCanvas.clientWidth, h=starCanvas.clientHeight;
+  ctx.clearRect(0,0,w,h);
+  for(let i=0;i<n;i++){
+    const x=Math.random()*w, y=Math.random()*h;
+    const r = Math.random()<0.02?1.6:Math.random()<0.1?1.2:0.6;
+    const a = 0.7 + Math.random()*0.3;
+    ctx.fillStyle = `rgba(255,255,255,${a})`;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+}
+function scaleLogo(){ const h = stage.clientHeight; const base = Math.max(48, Math.min(220, h*0.20)); logoText.style.fontSize = base+'px'; }
+function fullscreen(el){ if(el.requestFullscreen) return el.requestFullscreen(); return Promise.resolve(); }
+
+// ---- UI binding ----
+function bindInputs(){
+  const apply = () => {
+    titleText.textContent = q('titleCard').value;
+    epOut.textContent = q('episode').value;
+    subOut.textContent = q('subtitle').value;
+    bodyOut.innerHTML = '';
+    splitParagraphs(q('body').value).forEach(p=>{ const el=document.createElement('p'); el.className='para'; el.textContent=p; bodyOut.appendChild(el); });
+
+    // CSS vars
+    root.style.setProperty('--crawl-width', q('width').value+'vw');
+    root.style.setProperty('--base-font', q('base').value+'px');
+    root.style.setProperty('--letter-space', q('ls').value+'px');
+    root.style.setProperty('--crawl-duration', q('speed').value+'s');
+    root.style.setProperty('--title-hold', q('thold').value+'s');
+    root.style.setProperty('--title-fade', q('tfade').value+'s');
+    root.style.setProperty('--tilt', q('tilt').value+'deg');
+    root.style.setProperty('--persp', q('persp').value+'px');
+    root.style.setProperty('--logo-hold', q('logoHold').value+'s');
+    root.style.setProperty('--logo-shrink', q('logoShrink').value+'s');
+
+    // labels
+    q('wVal').textContent = q('width').value+'%';
+    q('fVal').textContent = q('base').value+'px';
+    q('lsVal').textContent = q('ls').value+'px';
+    q('spdVal').textContent = q('speed').value+'s';
+    q('thVal').textContent = (+q('thold').value).toFixed(1)+'s';
+    q('tfVal').textContent = (+q('tfade').value).toFixed(1)+'s';
+    q('scVal').textContent = q('starCount').value;
+    q('tiltVal').textContent = q('tilt').value+'°';
+    q('perspVal').textContent = q('persp').value+'px';
+    q('lhVal').textContent = (+q('logoHold').value).toFixed(1)+'s';
+    q('lsrVal').textContent = (+q('logoShrink').value).toFixed(1)+'s';
+
+    q('volVal').textContent = (+q('musicVol').value).toFixed(2);
+    q('delayVal').textContent = (+q('musicDelay').value).toFixed(1)+'s';
+    q('offsetVal').textContent = (+q('musicOffset').value).toFixed(1)+'s';
+    q('fadeVal').textContent = (+q('musicFade').value).toFixed(1)+'s';
+    q('fadeStartVal').textContent = (+q('musicFadeStart').value).toFixed(1)+'s';
+
+    // effects
+    toggleStars(q('starsToggle').checked);
+    drawStars(+q('starCount').value);
+    scaleLogo();
+
+    audio.volume = +q('musicVol').value;
+  };
+
+  const ids = ['titleCard','episode','subtitle','body','width','base','ls','speed','thold','tfade','starCount','tilt','persp','logoHold','logoShrink','musicVol','musicDelay','musicOffset','musicFade','musicFadeStart','starsToggle'];
+  ids.forEach(id=>{ const el=q(id); if(!el) return; ['input','change'].forEach(evt=> el.addEventListener(evt, apply)); });
+
+  q('musicFile').addEventListener('change',()=>{ if(audioURL){ URL.revokeObjectURL(audioURL); audioURL=null; } const f=q('musicFile').files&&q('musicFile').files[0]; if(f){ audioURL=URL.createObjectURL(f); audio.src=audioURL; }});
+
+  window.addEventListener('resize', ()=>{ resizeCanvas(); drawStars(+q('starCount').value); scaleLogo(); });
+  apply();
+}
+
+// ---- sequence + audio ----
+function scheduleAudio(){
+  const delayMs = Math.max(0, (+q('musicDelay').value||0) * 1000);
+  const offset = +q('musicOffset').value || 0; // seconds into track at crawl start
+  if(audio.src){
+    try { audio.pause(); audio.currentTime = Math.max(0, offset); } catch(e){}
+    setTimeout(()=>{ audio.play().catch(err=>console.warn('Audio play blocked:', err)); }, delayMs);
+  }
+}
+function startFadeOut(durationSec){
+  if(!audio.src || durationSec<=0) return;
+  const steps = 30, stepMs = (durationSec*1000)/steps; let i=0; const startVol = +q('musicVol').value;
+  if(fadeTimer){ clearInterval(fadeTimer); }
+  fadeTimer = setInterval(()=>{
+    i++; const t=i/steps; const v=Math.max(0, startVol*(1-t));
+    try{ audio.volume = v; }catch(e){}
+    if(i>=steps){ clearInterval(fadeTimer); fadeTimer=null; try{ audio.pause(); }catch(e){} }
+  }, stepMs);
+}
+
+function start(){
+  clearTimers();
+  stage.classList.remove('state-done','state-logo','state-crawl');
+  stage.classList.add('state-title');
+
+  scheduleAudio();
+
+  const hold = ms(getVar('--title-hold'));
+  const fade = ms(getVar('--title-fade'));
+  const logoHold = ms(getVar('--logo-hold'));
+  const logoShrink = ms(getVar('--logo-shrink'));
+  const crawlDur  = ms(getVar('--crawl-duration'));
+
+  // transitions
+  timers.push(setTimeout(()=>{ stage.classList.remove('state-title'); stage.classList.add('state-logo'); }, hold+fade));
+  timers.push(setTimeout(()=>{ stage.classList.remove('state-logo'); stage.classList.add('state-crawl'); }, hold+fade+logoHold+logoShrink));
+
+  // schedule fade so it ENDS at crawl finish. Start = total - fadeStartOffset - fadeDuration
+  const fadeDurSec = +q('musicFade').value || 0;
+  const fadeStartOffsetSec = Math.max(0, +q('musicFadeStart').value || 0);
+  const preCrawlMs = hold+fade+logoHold+logoShrink;
+  const startFadeAt = Math.max(0, preCrawlMs + (crawlDur - ((fadeStartOffsetSec+fadeDurSec)*1000)));
+  if(fadeDurSec>0){ timers.push(setTimeout(()=> startFadeOut(fadeDurSec), startFadeAt)); }
+
+  timers.push(setTimeout(()=>{ stage.classList.remove('state-crawl'); stage.classList.add('state-done'); }, hold+fade+logoHold+logoShrink+crawlDur));
+}
+
+function exit(){ clearTimers(); stage.classList.remove('state-title','state-logo','state-crawl','state-done'); try{ audio.pause(); }catch(e){} if(document.fullscreenElement) document.exitFullscreen(); }
+
+// buttons
+q('start').addEventListener('click', async ()=>{ await fullscreen(stage); start(); });
+q('exit').addEventListener('click', exit);
+q('replay').addEventListener('click', start);
+q('close').addEventListener('click', exit);
+
+// tests
+function runTests(){
+  const cases=[
+    {name:'LF split', input:'a\n\nb', exp:['a','b']},
+    {name:'CRLF split', input:'a\r\n\r\nb', exp:['a','b']},
+    {name:'Multi blank', input:'a\n\n\n b ', exp:['a','b']},
+    {name:'Single para', input:'single', exp:['single']},
+    {name:'Trim spaces', input:'  a  \n\n  b  ', exp:['a','b']},
+    {name:'Trailing blanks', input:'a\n\n\n', exp:['a']},
+    {name:'CR only split', input:'a\r\rb', exp:['a','b']},
+    {name:'Empty string', input:'   ', exp:[]},
+  ];
+  let ok=true; cases.forEach(tc=>{ const got=splitParagraphs(tc.input).map(s=>s.trim()); const pass=JSON.stringify(got)===JSON.stringify(tc.exp); console[pass?'log':'error'](`[test] ${tc.name}:`, pass?'PASS':'FAIL', {got,exp:tc.exp}); if(!pass) ok=false; }); if(!ok) console.error('[test] One or more tests failed.');
+}
+
+// init
+resizeCanvas();
+bindInputs();
+drawStars(+q('starCount').value);
+scaleLogo();
+runTests();
+</script>
+</body>
+</html>
